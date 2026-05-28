@@ -518,13 +518,11 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 16px;
-      display: none;
       max-height: calc(100vh - 160px);
       overflow: hidden;
-      display: none;
+      display: flex;
       flex-direction: column;
     }
-    .side-panel.visible { display: flex; }
     .side-panel-body-scroll {
       overflow-y: auto;
       flex: 1;
@@ -1130,9 +1128,11 @@ function setupEventListeners() {
   document.getElementById("mode-count").addEventListener("click", () => setMatrixMode("count"));
   document.getElementById("mode-pct").addEventListener("click", () => setMatrixMode("pct"));
 
-  // Matrix side panel close
+  // Matrix side panel close — reset to hint state (keep panel visible for stable layout)
   document.getElementById("side-panel-close").addEventListener("click", () => {
-    document.getElementById("side-panel").classList.remove("visible");
+    document.getElementById("side-panel-title").textContent = "Posts";
+    document.getElementById("side-panel-body").innerHTML =
+      `<div class="side-panel-hint">Click a cell in the heatmap to see posts for that emotion × AI relation combination.</div>`;
   });
 
   // Distribution posts panel close
@@ -1494,7 +1494,6 @@ function showSidePanel(emotion, aiRel, posts) {
     `).join("") + (matching.length > 1 ? `<div class="side-panel-hint" style="padding:12px 0 4px;">${matching.length} posts — sorted by score</div>` : "");
   }
 
-  document.getElementById("side-panel").classList.add("visible");
 }
 
 // ─────────────────────────────────────────────
