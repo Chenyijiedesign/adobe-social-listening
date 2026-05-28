@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reddit Social Listening · Adobe Creative Communities</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #FFFFFF;
+      --sidebar-bg: #F8FAFC;
+      --border: #E2E8F0;
+      --text: #1E293B;
+      --text-muted: #64748B;
+      --text-light: #94A3B8;
+      --navy: #0F172A;
+      --navy-mid: #1E293B;
+      --accent: #6366F1;
+      --accent-light: #EEF2FF;
+      --sidebar-width: 260px;
+      --header-height: 64px;
+      --tab-height: 52px;
+      --radius: 8px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    #app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    header {
+      height: var(--header-height);
+      background: var(--navy);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+    header .logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; color: white;
+      flex-shrink: 0;
+    }
+    header .title-block { flex: 1; }
+    header h1 { font-size: 16px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.01em; }
+    header p { font-size: 12px; color: #94A3B8; margin-top: 1px; }
+
+    #total-badge {
+      background: rgba(99,102,241,0.25);
+      color: #A5B4FC;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(99,102,241,0.3);
+      white-space: nowrap;
+    }
+
+    .body-row {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: var(--sidebar-width);
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: width 0.2s ease;
+    }
+    #sidebar.collapsed { width: 0; overflow: hidden; }
+
+    .sidebar-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .sidebar-header span {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .sidebar-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .sidebar-actions button {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .sidebar-actions button:hover { background: var(--accent-light); }
+
+    #filter-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0 16px;
+    }
+    #filter-scroll::-webkit-scrollbar { width: 4px; }
+    #filter-scroll::-webkit-scrollbar-track { background: transparent; }
+    #filter-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .category-group { border-bottom: 1px solid var(--border); }
+    .category-group:last-child { border-bottom: none; }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px;
+      cursor: pointer;
+      gap: 8px;
+      user-select: none;
+    }
+    .category-header:hover { background: rgba(0,0,0,0.03); }
+
+    .cat-chevron {
+      width: 14px; height: 14px;
+      transition: transform 0.15s ease;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .category-group.open .cat-chevron { transform: rotate(90deg); }
+
+    .cat-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .cat-label {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .cat-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    .cat-toggle {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--accent);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .cat-toggle:hover { background: var(--accent-light); }
+
+    .category-items { display: none; padding: 0 0 6px; }
+    .category-group.open .category-items { display: block; }
+
+    .sub-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 16px 4px 38px;
+      cursor: pointer;
+    }
+    .sub-item:hover { background: rgba(0,0,0,0.03); }
+    .sub-item input[type="checkbox"] {
+      width: 14px; height: 14px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .sub-item label {
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      flex: 1;
+    }
+    .sub-count {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ── Main content ── */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    /* ── Tabs ── */
+    #tab-bar {
+      height: var(--tab-height);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      padding: 0 24px;
+      gap: 4px;
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+
+    .tab-btn {
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--navy);
+      font-weight: 600;
+      border-bottom-color: var(--navy);
+    }
+
+    #sidebar-toggle {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 6px;
+    }
+    #sidebar-toggle:hover { background: var(--sidebar-bg); color: var(--text); }
+    #sidebar-toggle svg { width: 16px; height: 16px; }
+
+    /* ── Tab panels ── */
+    #tab-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    #tab-content::-webkit-scrollbar { width: 6px; }
+    #tab-content::-webkit-scrollbar-track { background: transparent; }
+    #tab-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .tab-panel { display: none; padding: 24px; }
+    .tab-panel.active { display: block; }
+
+    /* ── Summary bar ── */
+    .summary-bar {
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .summary-stat { display: flex; align-items: baseline; gap: 6px; }
+    .summary-stat .val {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .summary-stat .lbl {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    .summary-divider {
+      width: 1px; height: 32px;
+      background: var(--border);
+    }
+
+    /* ── Chart grid ── */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .chart-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .chart-card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .chart-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .chart-card-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .chart-wrap { width: 100%; }
+
+    /* ── Heatmap / Tab 2 ── */
+    .heatmap-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .toggle-group {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .toggle-btn {
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--bg);
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .toggle-btn + .toggle-btn { border-left: 1px solid var(--border); }
+    .toggle-btn.active {
+      background: var(--navy);
+      color: white;
+    }
+    .toggle-btn:hover:not(.active) { background: var(--sidebar-bg); }
+
+    .heatmap-layout {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .heatmap-main { flex: 1; min-width: 0; }
+    .side-panel {
+      width: 320px;
+      flex-shrink: 0;
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: none;
+    }
+    .side-panel.visible { display: block; }
+    .side-panel-header {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .side-panel-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 16px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .side-panel-close:hover { background: var(--border); }
+
+    .post-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      transition: box-shadow 0.15s;
+    }
+    .post-card:hover { box-shadow: var(--shadow-sm); }
+    .post-card:last-child { margin-bottom: 0; }
+    .post-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 5px;
+      line-height: 1.4;
+    }
+    .post-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .post-sub {
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .post-score {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .post-link {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .post-link:hover { color: var(--accent); }
+    .side-panel-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 24px 0;
+      line-height: 1.6;
+    }
+
+    /* ── UMAP / Tab 3 ── */
+    .umap-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .control-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .select-styled {
+      appearance: none;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 28px 6px 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      font-family: inherit;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .select-styled:focus { border-color: var(--accent); }
+
+    .umap-no-data {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 400px;
+      text-align: center;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+    .umap-no-data h3 { font-size: 16px; color: var(--text); }
+    .umap-no-data p { font-size: 13px; max-width: 420px; line-height: 1.6; }
+    .umap-no-data code {
+      display: inline-block;
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 14px;
+      font-size: 12px;
+      margin-top: 4px;
+      font-family: 'Menlo', 'Monaco', monospace;
+      color: var(--text);
+    }
+
+    /* ── Loading ── */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    /* ── Error ── */
+    #error-banner {
+      display: none;
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin: 24px;
+      color: #DC2626;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    #error-banner strong { display: block; margin-bottom: 4px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      :root { --sidebar-width: 220px; }
+      .chart-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      #sidebar { display: none; }
+      #sidebar.mobile-open { display: flex; position: fixed; left: 0; top: 0; height: 100%; z-index: 200; }
+      .heatmap-layout { flex-direction: column; }
+      .side-panel { width: 100%; }
+    }
+
+    /* ── Utility ── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading social listening data…</div>
+</div>
+
+<div id="app" style="display:none;">
+  <header>
+    <div class="logo">R</div>
+    <div class="title-block">
+      <h1>Reddit Social Listening</h1>
+      <p>Adobe Creative Communities · 2026</p>
+    </div>
+    <div id="total-badge">— posts</div>
+  </header>
+
+  <div class="body-row">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-header">
+        <span>Subreddits</span>
+        <div class="sidebar-actions">
+          <button id="select-all-btn">All</button>
+          <button id="select-none-btn">None</button>
+        </div>
+      </div>
+      <div id="filter-scroll">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div id="main">
+      <div id="tab-bar">
+        <button class="tab-btn active" data-tab="distribution">Distribution</button>
+        <button class="tab-btn" data-tab="matrix">Emotion × AI Matrix</button>
+        <button class="tab-btn" data-tab="umap">UMAP Landscape</button>
+        <button id="sidebar-toggle" title="Toggle sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M9 3v18"/>
+          </svg>
+          Filters
+        </button>
+      </div>
+
+      <div id="tab-content">
+        <div id="error-banner">
+          <strong>Failed to load data</strong>
+          <span id="error-msg">Make sure viz_data.json is in the same directory and you are serving via <code>python3 -m http.server 8080</code>.</span>
+        </div>
+
+        <!-- Tab 1: Distribution -->
+        <div class="tab-panel active" id="panel-distribution">
+          <div class="summary-bar" id="summary-bar">
+            <div class="summary-stat">
+              <span class="val" id="stat-posts">—</span>
+              <span class="lbl">posts selected</span>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-stat">
+              <span class="val" id="stat-subs">—</span>
+              <span class="lbl">subreddits</span>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-stat">
+              <span class="val" id="stat-ai">—</span>
+              <span class="lbl">AI-related</span>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-stat">
+              <span class="val" id="stat-adobe">—</span>
+              <span class="lbl">Adobe-related</span>
+            </div>
+          </div>
+
+          <div class="chart-grid">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <span class="chart-card-title">Emotion</span>
+                <span class="chart-card-subtitle" id="subtitle-emotion"></span>
+              </div>
+              <div class="chart-wrap" id="chart-emotion"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <span class="chart-card-title">Creative Activity</span>
+                <span class="chart-card-subtitle" id="subtitle-activity"></span>
+              </div>
+              <div class="chart-wrap" id="chart-activity"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <span class="chart-card-title">AI Relation</span>
+                <span class="chart-card-subtitle" id="subtitle-airel"></span>
+              </div>
+              <div class="chart-wrap" id="chart-airel"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Emotion × AI Matrix -->
+        <div class="tab-panel" id="panel-matrix">
+          <div class="heatmap-controls">
+            <div class="toggle-group">
+              <button class="toggle-btn active" data-mode="count" id="mode-count">Raw Count</button>
+              <button class="toggle-btn" data-mode="pct" id="mode-pct">% of Emotion</button>
+            </div>
+            <span style="font-size:12px;color:var(--text-muted);">Click a cell to see sample posts</span>
+          </div>
+          <div class="heatmap-layout">
+            <div class="heatmap-main">
+              <div id="chart-heatmap"></div>
+            </div>
+            <div class="side-panel" id="side-panel">
+              <div class="side-panel-header">
+                <span id="side-panel-title">Sample Posts</span>
+                <button class="side-panel-close" id="side-panel-close">×</button>
+              </div>
+              <div id="side-panel-body">
+                <div class="side-panel-hint">Click a cell in the heatmap to see sample posts for that emotion × AI relation combination.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: UMAP -->
+        <div class="tab-panel" id="panel-umap">
+          <div class="umap-controls">
+            <span class="control-label">Color by</span>
+            <select class="select-styled" id="umap-color-by">
+              <option value="emotion">Emotion</option>
+              <option value="activity">Creative Activity</option>
+              <option value="ai_relation">AI Relation</option>
+              <option value="subreddit">Subreddit</option>
+              <option value="ai_related">AI Related</option>
+              <option value="adobe_related">Adobe Related</option>
+            </select>
+          </div>
+          <div id="chart-umap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────
+const EMOTIONS = ["pride","curiosity","excitement","neutral","anxiety","resentment","humor","skepticism","fatigue","nostalgia","grief","liberation"];
+const AI_RELATIONS = ["none","experimentation","augmentation","rejection","orchestration","reluctant_adoption","replacement","collaboration","optimization","adaptation","dependency","identity_shift"];
+const AI_RELATIONS_NO_NONE = AI_RELATIONS.filter(r => r !== "none");
+const ACTIVITIES = ["showcase","help_request","discussion","emotional_expression","workflow_share","critique","meme","tutorial","experimentation","prediction"];
+
+const EMOTION_COLORS = {
+  excitement:"#F59E0B", curiosity:"#3B82F6", pride:"#8B5CF6",
+  liberation:"#10B981", anxiety:"#EF4444", fatigue:"#94A3B8",
+  skepticism:"#F97316", resentment:"#DC2626", grief:"#374151",
+  nostalgia:"#EC4899", humor:"#FBBF24", neutral:"#CBD5E1"
+};
+const AI_RELATION_COLORS = {
+  none:"#E2E8F0", experimentation:"#60A5FA", augmentation:"#34D399",
+  collaboration:"#A78BFA", orchestration:"#F472B6", dependency:"#FB7185",
+  optimization:"#4ADE80", adaptation:"#FCD34D", reluctant_adoption:"#F97316",
+  rejection:"#EF4444", replacement:"#B91C1C", identity_shift:"#7C3AED"
+};
+const ACTIVITY_COLORS = {
+  showcase:"#8B5CF6", help_request:"#3B82F6", discussion:"#10B981",
+  emotional_expression:"#EC4899", workflow_share:"#F59E0B", critique:"#EF4444",
+  meme:"#FBBF24", tutorial:"#6366F1", experimentation:"#14B8A6", prediction:"#F97316"
+};
+
+const CATEGORY_COLORS = {
+  "3D & Gaming":     "#8B5CF6",
+  "Adobe":           "#EF4444",
+  "Design & Branding":"#3B82F6",
+  "AI & Visual":     "#10B981",
+  "Motion & VFX":    "#F59E0B",
+  "UX & Product":    "#EC4899"
+};
+
+const CATEGORY_SUBREDDITS = {
+  "3D & Gaming":      ["blender","3Dmodeling","gamedev","Unity3D","unrealengine"],
+  "Adobe":            ["photoshop","AfterEffects","Adobe","Lightroom","adobeanimate","PremierePro","AdobeIllustrator"],
+  "Design & Branding":["logodesign","graphic_design","typography","Design","branding"],
+  "AI & Visual":      ["ChatGPT","ClaudeAI","midjourney","StableDiffusion","aiArt","comfyui"],
+  "Motion & VFX":     ["Filmmakers","cinematography","vfx","editors"],
+  "UX & Product":     ["UXDesign","web_design","FigmaDesign","Frontend","userexperience"]
+};
+
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+window.DATA = null;
+let selectedSubs = new Set();
+let activeTab = "distribution";
+let matrixMode = "count"; // "count" | "pct"
+let umapColorBy = "emotion";
+let debounceTimer = null;
+
+// ─────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch("viz_data.json");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    window.DATA = await res.json();
+  } catch(e) {
+    document.getElementById("loading-overlay").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+    document.getElementById("error-banner").style.display = "block";
+    document.getElementById("error-msg").textContent =
+      `${e.message} — Make sure viz_data.json is in the same directory and you are serving via python3 -m http.server 8080.`;
+    return;
+  }
+
+  // Pre-compute sub→category map
+  window.SUB_TO_CAT = {};
+  for (const [cat, subs] of Object.entries(CATEGORY_SUBREDDITS)) {
+    for (const s of subs) window.SUB_TO_CAT[s] = cat;
+  }
+
+  // Determine which subreddits actually have posts
+  const activeSubs = new Set(window.DATA.posts.map(p => p.subreddit));
+  window.ACTIVE_SUBS = activeSubs;
+
+  // Default: all selected
+  for (const s of activeSubs) selectedSubs.add(s);
+
+  buildSidebar();
+  setupEventListeners();
+  updateTotalBadge();
+
+  document.getElementById("loading-overlay").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+
+  // Render initial tab
+  renderTab("distribution");
+}
+
+// ─────────────────────────────────────────────
+// Sidebar construction
+// ─────────────────────────────────────────────
+function buildSidebar() {
+  const scroll = document.getElementById("filter-scroll");
+  scroll.innerHTML = "";
+
+  // Sub counts
+  const subCount = {};
+  for (const p of window.DATA.posts) {
+    subCount[p.subreddit] = (subCount[p.subreddit] || 0) + 1;
+  }
+
+  for (const [cat, subs] of Object.entries(CATEGORY_SUBREDDITS)) {
+    const activeSubs = subs.filter(s => window.ACTIVE_SUBS.has(s));
+    if (activeSubs.length === 0) continue;
+
+    const group = document.createElement("div");
+    group.className = "category-group open";
+    group.dataset.cat = cat;
+
+    const totalCount = activeSubs.reduce((a, s) => a + (subCount[s] || 0), 0);
+    const color = CATEGORY_COLORS[cat] || "#94A3B8";
+
+    group.innerHTML = `
+      <div class="category-header">
+        <svg class="cat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+        <span class="cat-dot" style="background:${color}"></span>
+        <span class="cat-label">${cat}</span>
+        <span class="cat-count">${totalCount.toLocaleString()}</span>
+        <button class="cat-toggle" data-cat="${cat}">All</button>
+      </div>
+      <div class="category-items">
+        ${activeSubs.map(s => `
+          <div class="sub-item">
+            <input type="checkbox" id="sub-${s}" value="${s}" checked />
+            <label for="sub-${s}">r/${s}</label>
+            <span class="sub-count">${(subCount[s] || 0).toLocaleString()}</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+    scroll.appendChild(group);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Event Listeners
+// ─────────────────────────────────────────────
+function setupEventListeners() {
+  // Tab switching
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.tab;
+      if (!tab) return;
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      document.getElementById(`panel-${tab}`).classList.add("active");
+      activeTab = tab;
+      renderTab(tab);
+    });
+  });
+
+  // Sidebar toggle
+  document.getElementById("sidebar-toggle").addEventListener("click", () => {
+    document.getElementById("sidebar").classList.toggle("collapsed");
+    setTimeout(() => triggerResize(), 220);
+  });
+
+  // Checkbox changes (delegated)
+  document.getElementById("filter-scroll").addEventListener("change", e => {
+    if (e.target.type === "checkbox") {
+      const val = e.target.value;
+      if (e.target.checked) selectedSubs.add(val);
+      else selectedSubs.delete(val);
+      scheduleFilterUpdate();
+    }
+  });
+
+  // Category toggle buttons
+  document.getElementById("filter-scroll").addEventListener("click", e => {
+    // Chevron / header click
+    const header = e.target.closest(".category-header");
+    if (header && !e.target.classList.contains("cat-toggle")) {
+      header.parentElement.classList.toggle("open");
+      return;
+    }
+    // Toggle all/none per category
+    if (e.target.classList.contains("cat-toggle")) {
+      const cat = e.target.dataset.cat;
+      const group = e.target.closest(".category-group");
+      if (!group) return;
+      const checkboxes = group.querySelectorAll("input[type=checkbox]");
+      const allChecked = Array.from(checkboxes).every(c => c.checked);
+      checkboxes.forEach(c => {
+        c.checked = !allChecked;
+        if (!allChecked) selectedSubs.add(c.value);
+        else selectedSubs.delete(c.value);
+      });
+      scheduleFilterUpdate();
+    }
+  });
+
+  // Global select all / none
+  document.getElementById("select-all-btn").addEventListener("click", () => {
+    document.querySelectorAll("#filter-scroll input[type=checkbox]").forEach(c => {
+      c.checked = true;
+      selectedSubs.add(c.value);
+    });
+    scheduleFilterUpdate();
+  });
+  document.getElementById("select-none-btn").addEventListener("click", () => {
+    document.querySelectorAll("#filter-scroll input[type=checkbox]").forEach(c => {
+      c.checked = false;
+      selectedSubs.delete(c.value);
+    });
+    scheduleFilterUpdate();
+  });
+
+  // Matrix mode toggle
+  document.getElementById("mode-count").addEventListener("click", () => setMatrixMode("count"));
+  document.getElementById("mode-pct").addEventListener("click", () => setMatrixMode("pct"));
+
+  // Side panel close
+  document.getElementById("side-panel-close").addEventListener("click", () => {
+    document.getElementById("side-panel").classList.remove("visible");
+  });
+
+  // UMAP color selector
+  document.getElementById("umap-color-by").addEventListener("change", e => {
+    umapColorBy = e.target.value;
+    renderUmap();
+  });
+}
+
+function setMatrixMode(mode) {
+  matrixMode = mode;
+  document.getElementById("mode-count").classList.toggle("active", mode === "count");
+  document.getElementById("mode-pct").classList.toggle("active", mode === "pct");
+  renderMatrix();
+}
+
+function scheduleFilterUpdate() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    updateTotalBadge();
+    renderTab(activeTab);
+    // Always keep UMAP in sync so dimming is correct when user navigates to it
+    if (activeTab !== "umap" && umapRendered) {
+      renderUmap();
+    }
+  }, 100);
+}
+
+function triggerResize() {
+  window.dispatchEvent(new Event("resize"));
+}
+
+function updateTotalBadge() {
+  const n = getFilteredPosts().length;
+  document.getElementById("total-badge").textContent = `${n.toLocaleString()} posts`;
+}
+
+// ─────────────────────────────────────────────
+// Data helpers
+// ─────────────────────────────────────────────
+function getFilteredPosts() {
+  if (!window.DATA) return [];
+  return window.DATA.posts.filter(p => selectedSubs.has(p.subreddit));
+}
+
+function countBy(posts, key) {
+  const m = {};
+  for (const p of posts) {
+    const v = p[key] || "unknown";
+    m[v] = (m[v] || 0) + 1;
+  }
+  return m;
+}
+
+// ─────────────────────────────────────────────
+// Tab rendering dispatcher
+// ─────────────────────────────────────────────
+function renderTab(tab) {
+  if (tab === "distribution") renderDistribution();
+  else if (tab === "matrix") renderMatrix();
+  else if (tab === "umap") renderUmap();
+}
+
+// ─────────────────────────────────────────────
+// Tab 1: Distribution
+// ─────────────────────────────────────────────
+function renderDistribution() {
+  const posts = getFilteredPosts();
+  const aiPosts = posts.filter(p => p.ai_related);
+  const adobePosts = posts.filter(p => p.adobe_related);
+
+  // Summary stats
+  document.getElementById("stat-posts").textContent = posts.length.toLocaleString();
+  document.getElementById("stat-subs").textContent = new Set(posts.map(p=>p.subreddit)).size;
+  document.getElementById("stat-ai").textContent = posts.length
+    ? `${Math.round(aiPosts.length / posts.length * 100)}%`
+    : "—";
+  document.getElementById("stat-adobe").textContent = posts.length
+    ? `${Math.round(adobePosts.length / posts.length * 100)}%`
+    : "—";
+
+  const subCount = new Set(posts.map(p=>p.subreddit)).size;
+  document.getElementById("subtitle-emotion").textContent = `${posts.length.toLocaleString()} posts`;
+  document.getElementById("subtitle-activity").textContent = `${posts.length.toLocaleString()} posts`;
+  document.getElementById("subtitle-airel").textContent =
+    `${aiPosts.length.toLocaleString()} AI-related (${posts.length ? Math.round(aiPosts.length/posts.length*100) : 0}%)`;
+
+  renderBarChart("chart-emotion", posts, "emotion", EMOTIONS, EMOTION_COLORS);
+  renderBarChart("chart-activity", posts, "activity", ACTIVITIES, ACTIVITY_COLORS);
+  renderBarChart("chart-airel", aiPosts, "ai_relation", AI_RELATIONS_NO_NONE, AI_RELATION_COLORS);
+}
+
+function renderBarChart(divId, posts, key, orderedKeys, colorMap) {
+  const counts = countBy(posts, key);
+  const data = orderedKeys
+    .map(k => ({ key: k, count: counts[k] || 0 }))
+    .filter(d => d.count > 0)
+    .sort((a, b) => a.count - b.count); // ascending so highest is at top
+
+  const barHeight = 22;
+  const minHeight = 200;
+  const chartHeight = Math.max(minHeight, data.length * barHeight + 60);
+
+  const trace = {
+    type: "bar",
+    orientation: "h",
+    x: data.map(d => d.count),
+    y: data.map(d => d.key.replace(/_/g, " ")),
+    marker: {
+      color: data.map(d => colorMap[d.key] || "#94A3B8"),
+      line: { width: 0 }
+    },
+    hovertemplate: "<b>%{y}</b><br>%{x} posts<extra></extra>",
+    texttemplate: "%{x}",
+    textposition: "outside",
+    textfont: { size: 11, color: "#64748B" },
+    cliponaxis: false,
+  };
+
+  const layout = {
+    height: chartHeight,
+    margin: { l: 110, r: 40, t: 8, b: 24 },
+    paper_bgcolor: "white",
+    plot_bgcolor: "white",
+    font: { family: "Inter, sans-serif", size: 11, color: "#64748B" },
+    xaxis: {
+      showgrid: true,
+      gridcolor: "#F1F5F9",
+      gridwidth: 1,
+      zeroline: false,
+      showline: false,
+      tickfont: { size: 10 },
+    },
+    yaxis: {
+      showgrid: false,
+      tickfont: { size: 11, color: "#334155" },
+      automargin: true,
+    },
+    bargap: 0.35,
+    modebar: { remove: ["pan2d","select2d","lasso2d","zoom2d","autoScale2d","resetScale2d"] }
+  };
+
+  Plotly.react(divId, [trace], layout, { responsive: true, displaylogo: false });
+}
+
+// ─────────────────────────────────────────────
+// Tab 2: Emotion × AI Relation Matrix
+// ─────────────────────────────────────────────
+function renderMatrix() {
+  const posts = getFilteredPosts();
+
+  // Build counts matrix: emotion (row) × ai_relation (col, no "none")
+  const matrix = {}; // matrix[emotion][ai_relation] = count
+  const emotionTotals = {};
+  for (const e of EMOTIONS) {
+    matrix[e] = {};
+    emotionTotals[e] = 0;
+    for (const r of AI_RELATIONS_NO_NONE) matrix[e][r] = 0;
+  }
+
+  for (const p of posts) {
+    const e = p.emotion;
+    const r = p.ai_relation;
+    if (!e || !r || r === "none" || !matrix[e] || !(r in matrix[e])) continue;
+    matrix[e][r]++;
+    emotionTotals[e]++;
+  }
+
+  // Build z values
+  const z = EMOTIONS.map(e => {
+    return AI_RELATIONS_NO_NONE.map(r => {
+      const c = matrix[e][r];
+      if (matrixMode === "pct") {
+        return emotionTotals[e] > 0 ? Math.round(c / emotionTotals[e] * 1000) / 10 : 0;
+      }
+      return c;
+    });
+  });
+
+  const zText = EMOTIONS.map(e => {
+    return AI_RELATIONS_NO_NONE.map(r => {
+      const c = matrix[e][r];
+      if (matrixMode === "pct") {
+        return emotionTotals[e] > 0
+          ? `${(c / emotionTotals[e] * 100).toFixed(1)}%`
+          : "0%";
+      }
+      return c > 0 ? c.toString() : "";
+    });
+  });
+
+  const trace = {
+    type: "heatmap",
+    z: z,
+    x: AI_RELATIONS_NO_NONE.map(r => r.replace(/_/g, " ")),
+    y: EMOTIONS,
+    text: zText,
+    texttemplate: "%{text}",
+    textfont: { size: 10 },
+    colorscale: [
+      [0, "#FFFFFF"],
+      [0.2, "#EDE9FE"],
+      [0.5, "#A78BFA"],
+      [0.8, "#7C3AED"],
+      [1, "#4C1D95"]
+    ],
+    showscale: true,
+    colorbar: {
+      thickness: 12,
+      len: 0.8,
+      tickfont: { size: 10, family: "Inter, sans-serif" },
+      title: {
+        text: matrixMode === "pct" ? "%" : "posts",
+        font: { size: 11, family: "Inter, sans-serif" }
+      }
+    },
+    hovertemplate: "<b>%{y}</b> × <b>%{x}</b><br>" +
+      (matrixMode === "pct" ? "%{text} of emotion" : "%{z} posts") +
+      "<extra></extra>",
+  };
+
+  const layout = {
+    height: 520,
+    margin: { l: 100, r: 80, t: 16, b: 110 },
+    paper_bgcolor: "white",
+    plot_bgcolor: "white",
+    font: { family: "Inter, sans-serif", size: 11, color: "#64748B" },
+    xaxis: {
+      tickangle: -35,
+      tickfont: { size: 11 },
+      side: "bottom",
+      gridcolor: "#F1F5F9",
+    },
+    yaxis: {
+      tickfont: { size: 11, color: "#334155" },
+      autorange: "reversed",
+      gridcolor: "#F1F5F9",
+    },
+    modebar: { remove: ["pan2d","select2d","lasso2d","zoom2d","autoScale2d","resetScale2d"] }
+  };
+
+  Plotly.react("chart-heatmap", [trace], layout, { responsive: true, displaylogo: false });
+
+  // Cell click handler — Plotly heatmap pointIndex is [row, col]
+  const heatmapEl = document.getElementById("chart-heatmap");
+  heatmapEl.removeAllListeners && heatmapEl.removeAllListeners("plotly_click");
+  heatmapEl.on("plotly_click", (event) => {
+    const pt = event.points[0];
+    if (!pt) return;
+    // pt.y is the emotion label, pt.x is the ai_relation label (with spaces)
+    const emotion = pt.y;
+    const aiRel = (pt.x || "").replace(/ /g, "_");
+    showSidePanel(emotion, aiRel, posts);
+  });
+}
+
+function showSidePanel(emotion, aiRel, posts) {
+  const matching = posts.filter(p => p.emotion === emotion && p.ai_relation === aiRel);
+  const sample = matching.slice(0, 5);
+
+  document.getElementById("side-panel-title").textContent =
+    `${emotion.replace(/_/g," ")} × ${aiRel.replace(/_/g," ")} · ${matching.length} posts`;
+
+  const body = document.getElementById("side-panel-body");
+  if (sample.length === 0) {
+    body.innerHTML = `<div class="side-panel-hint">No posts found for this combination.</div>`;
+  } else {
+    body.innerHTML = sample.map(p => `
+      <div class="post-card">
+        <div class="post-title">${escHtml(p.title || "Untitled")}</div>
+        <div class="post-meta">
+          <span class="post-sub">r/${escHtml(p.subreddit)}</span>
+          <span class="post-score">↑ ${(p.score || 0).toLocaleString()}</span>
+          ${p.url ? `<a class="post-link" href="${escHtml(p.url)}" target="_blank" rel="noopener">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>Open
+          </a>` : ""}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  document.getElementById("side-panel").classList.add("visible");
+}
+
+// ─────────────────────────────────────────────
+// Tab 3: UMAP
+// ─────────────────────────────────────────────
+let umapRendered = false;
+
+function renderUmap() {
+  if (!window.DATA) return;
+
+  if (!window.DATA.has_umap) {
+    document.getElementById("chart-umap").innerHTML = `
+      <div class="umap-no-data">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 8v4m0 4h.01"/>
+        </svg>
+        <h3>UMAP coordinates not available</h3>
+        <p>To enable the UMAP landscape view, run the dimensionality reduction script on your data to generate <code>ux</code> and <code>uy</code> coordinates, then set <code>"has_umap": true</code> in viz_data.json.</p>
+        <code>python3 prepare_viz_data.py --umap</code>
+      </div>`;
+    return;
+  }
+
+  // Build traces grouped by color dimension
+  const allPosts = window.DATA.posts;
+  const colorGroups = getColorGroups(allPosts, umapColorBy);
+
+  // Build one trace per group
+  const traces = [];
+
+  for (const [label, groupPosts] of Object.entries(colorGroups)) {
+    const isSelected = groupPosts.some(p => selectedSubs.has(p.subreddit));
+    const xs = [], ys = [], texts = [], urls = [], opacities = [];
+
+    for (const p of groupPosts) {
+      if (p.ux == null || p.uy == null) continue;
+      xs.push(p.ux);
+      ys.push(p.uy);
+      const inFilter = selectedSubs.has(p.subreddit);
+      opacities.push(inFilter ? 0.75 : 0.08);
+      const t = (p.title || "").slice(0, 80) + ((p.title || "").length > 80 ? "…" : "");
+      texts.push(
+        `<b>${escHtml(t)}</b><br>` +
+        `r/${p.subreddit}<br>` +
+        `${p.emotion || "—"} · ${(p.activity || "—").replace(/_/g," ")}<br>` +
+        `AI: ${(p.ai_relation || "none").replace(/_/g," ")}<br>` +
+        `Score: ${(p.score || 0).toLocaleString()}`
+      );
+      urls.push(p.url || "");
+    }
+
+    const color = getGroupColor(label, umapColorBy);
+
+    traces.push({
+      type: "scattergl",
+      mode: "markers",
+      name: label.replace(/_/g, " "),
+      x: xs,
+      y: ys,
+      text: texts,
+      hovertemplate: "%{text}<extra></extra>",
+      customdata: urls,
+      legendgroup: label,
+      marker: {
+        size: 5,
+        color: color,
+        opacity: opacities,
+        line: { width: 0.5, color: "rgba(255,255,255,0.4)" }
+      },
+    });
+  }
+
+  const layout = {
+    height: Math.max(560, window.innerHeight - 200),
+    paper_bgcolor: "white",
+    plot_bgcolor: "#FAFAFA",
+    margin: { l: 16, r: 16, t: 16, b: 16 },
+    font: { family: "Inter, sans-serif", size: 11 },
+    xaxis: {
+      showgrid: false, zeroline: false, showticklabels: false,
+      showline: false,
+    },
+    yaxis: {
+      showgrid: false, zeroline: false, showticklabels: false,
+      showline: false,
+    },
+    legend: {
+      bgcolor: "rgba(255,255,255,0.9)",
+      bordercolor: "#E2E8F0",
+      borderwidth: 1,
+      font: { size: 11, family: "Inter, sans-serif" },
+      itemsizing: "constant",
+      x: 1.01, y: 1,
+      xanchor: "left",
+    },
+    showlegend: true,
+    hovermode: "closest",
+    modebar: { remove: ["pan2d","select2d","lasso2d","autoScale2d","resetScale2d"] }
+  };
+
+  Plotly.react("chart-umap", traces, layout, { responsive: true, displaylogo: false });
+
+  // Click handler
+  const umapEl = document.getElementById("chart-umap");
+  umapEl.removeAllListeners && umapEl.removeAllListeners("plotly_click");
+  umapEl.on("plotly_click", (event) => {
+    const pt = event.points[0];
+    if (pt && pt.customdata) {
+      window.open(pt.customdata, "_blank", "noopener");
+    }
+  });
+
+  umapRendered = true;
+}
+
+// ─────────────────────────────────────────────
+// UMAP color helpers
+// ─────────────────────────────────────────────
+function getColorGroups(posts, colorBy) {
+  const groups = {};
+  for (const p of posts) {
+    let key;
+    if (colorBy === "emotion") key = p.emotion || "unknown";
+    else if (colorBy === "activity") key = p.activity || "unknown";
+    else if (colorBy === "ai_relation") key = p.ai_relation || "none";
+    else if (colorBy === "subreddit") key = p.subreddit || "unknown";
+    else if (colorBy === "ai_related") key = p.ai_related ? "AI-related" : "Not AI-related";
+    else if (colorBy === "adobe_related") key = p.adobe_related ? "Adobe-related" : "Not Adobe-related";
+    else key = "unknown";
+
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  }
+  return groups;
+}
+
+function getGroupColor(label, colorBy) {
+  if (colorBy === "emotion") return EMOTION_COLORS[label] || "#94A3B8";
+  if (colorBy === "activity") return ACTIVITY_COLORS[label] || "#94A3B8";
+  if (colorBy === "ai_relation") return AI_RELATION_COLORS[label] || "#94A3B8";
+  if (colorBy === "subreddit") return CATEGORY_COLORS[window.SUB_TO_CAT[label]] || "#94A3B8";
+  if (colorBy === "ai_related") return label === "AI-related" ? "#10B981" : "#CBD5E1";
+  if (colorBy === "adobe_related") return label === "Adobe-related" ? "#EF4444" : "#CBD5E1";
+  return "#94A3B8";
+}
+
+// ─────────────────────────────────────────────
+// Utility
+// ─────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Responsive: re-layout on window resize
+window.addEventListener("resize", () => {
+  ["chart-emotion","chart-activity","chart-airel"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.data) Plotly.Plots.resize(el);
+  });
+  ["chart-heatmap","chart-umap"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.data) Plotly.Plots.resize(el);
+  });
+});
+
+// ─────────────────────────────────────────────
+// Start
+// ─────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
