@@ -126,6 +126,46 @@
     }
     .sidebar-actions button:hover { background: var(--accent-light); }
 
+    .quick-filters {
+      padding: 10px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .quick-filter-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+    .qf-btn {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 11px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: var(--bg);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: left;
+    }
+    .qf-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+    .qf-btn[data-active="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .qf-btn[data-active="true"]:hover { opacity: 0.88; }
+    .qf-icon { font-size: 14px; line-height: 1; }
+
     #filter-scroll {
       flex: 1;
       overflow-y: auto;
@@ -343,7 +383,96 @@
       font-size: 11px;
       color: var(--text-muted);
     }
-    .chart-wrap { width: 100%; }
+    .chart-wrap { width: 100%; cursor: pointer; }
+
+    /* Distribution posts panel */
+    .dist-post-panel {
+      display: none;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .dist-post-panel.visible { display: block; }
+    .dist-post-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--sidebar-bg);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .dist-panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .dist-panel-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: 8px;
+    }
+    .dist-panel-close {
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0 4px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .dist-panel-close:hover { background: var(--border); }
+    .dist-post-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 10px;
+      padding: 14px 16px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .dist-post-grid::-webkit-scrollbar { height: 4px; width: 4px; }
+    .dist-post-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .dist-post-card {
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      transition: box-shadow 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .dist-post-card:hover { box-shadow: var(--shadow-sm); }
+    .dist-post-card-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .dist-post-card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .dist-post-sub { font-size: 11px; color: var(--accent); font-weight: 500; }
+    .dist-post-score { font-size: 11px; color: var(--text-muted); }
+    .dist-post-link {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .dist-post-link:hover { color: var(--accent); }
 
     /* ── Heatmap / Tab 2 ── */
     .heatmap-controls {
@@ -390,8 +519,17 @@
       border-radius: var(--radius);
       padding: 16px;
       display: none;
+      max-height: calc(100vh - 160px);
+      overflow: hidden;
+      display: none;
+      flex-direction: column;
     }
-    .side-panel.visible { display: block; }
+    .side-panel.visible { display: flex; }
+    .side-panel-body-scroll {
+      overflow-y: auto;
+      flex: 1;
+      padding-right: 4px;
+    }
     .side-panel-header {
       font-size: 12px;
       font-weight: 600;
@@ -621,6 +759,18 @@
           <button id="select-none-btn">None</button>
         </div>
       </div>
+
+      <!-- Quick filters -->
+      <div class="quick-filters">
+        <div class="quick-filter-label">Quick Filters</div>
+        <button id="filter-ai-btn" class="qf-btn" data-active="false">
+          <span class="qf-icon">🤖</span> AI Related
+        </button>
+        <button id="filter-adobe-btn" class="qf-btn" data-active="false">
+          <span class="qf-icon">🎨</span> Adobe Related
+        </button>
+      </div>
+
       <div id="filter-scroll">
         <!-- Populated by JS -->
       </div>
@@ -694,6 +844,18 @@
               <div class="chart-wrap" id="chart-airel"></div>
             </div>
           </div>
+
+          <!-- Posts panel (shown on bar click) -->
+          <div class="dist-post-panel" id="dist-post-panel">
+            <div class="dist-post-panel-header">
+              <div style="display:flex;align-items:baseline;gap:8px;">
+                <span class="dist-panel-title" id="dist-panel-title">Posts</span>
+                <span class="dist-panel-meta" id="dist-panel-meta"></span>
+              </div>
+              <button class="dist-panel-close" id="dist-panel-close">×</button>
+            </div>
+            <div class="dist-post-grid" id="dist-post-grid"></div>
+          </div>
         </div>
 
         <!-- Tab 2: Emotion × AI Matrix -->
@@ -714,8 +876,10 @@
                 <span id="side-panel-title">Sample Posts</span>
                 <button class="side-panel-close" id="side-panel-close">×</button>
               </div>
-              <div id="side-panel-body">
-                <div class="side-panel-hint">Click a cell in the heatmap to see sample posts for that emotion × AI relation combination.</div>
+              <div class="side-panel-body-scroll">
+                <div id="side-panel-body">
+                  <div class="side-panel-hint">Click a cell in the heatmap to see posts for that emotion × AI relation combination.</div>
+                </div>
               </div>
             </div>
           </div>
@@ -791,6 +955,8 @@ const CATEGORY_SUBREDDITS = {
 // ─────────────────────────────────────────────
 window.DATA = null;
 let selectedSubs = new Set();
+let filterAI = false;
+let filterAdobe = false;
 let activeTab = "distribution";
 let matrixMode = "count"; // "count" | "pct"
 let umapColorBy = "emotion";
@@ -964,15 +1130,32 @@ function setupEventListeners() {
   document.getElementById("mode-count").addEventListener("click", () => setMatrixMode("count"));
   document.getElementById("mode-pct").addEventListener("click", () => setMatrixMode("pct"));
 
-  // Side panel close
+  // Matrix side panel close
   document.getElementById("side-panel-close").addEventListener("click", () => {
     document.getElementById("side-panel").classList.remove("visible");
+  });
+
+  // Distribution posts panel close
+  document.getElementById("dist-panel-close").addEventListener("click", () => {
+    document.getElementById("dist-post-panel").classList.remove("visible");
   });
 
   // UMAP color selector
   document.getElementById("umap-color-by").addEventListener("change", e => {
     umapColorBy = e.target.value;
     renderUmap();
+  });
+
+  // Quick filters: AI Related & Adobe Related
+  document.getElementById("filter-ai-btn").addEventListener("click", () => {
+    filterAI = !filterAI;
+    document.getElementById("filter-ai-btn").dataset.active = filterAI;
+    scheduleFilterUpdate();
+  });
+  document.getElementById("filter-adobe-btn").addEventListener("click", () => {
+    filterAdobe = !filterAdobe;
+    document.getElementById("filter-adobe-btn").dataset.active = filterAdobe;
+    scheduleFilterUpdate();
   });
 }
 
@@ -986,6 +1169,8 @@ function setMatrixMode(mode) {
 function scheduleFilterUpdate() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
+    // Hide distribution panel — data is stale after filter change
+    document.getElementById("dist-post-panel").classList.remove("visible");
     updateTotalBadge();
     renderTab(activeTab);
     // Always keep UMAP in sync so dimming is correct when user navigates to it
@@ -1009,7 +1194,12 @@ function updateTotalBadge() {
 // ─────────────────────────────────────────────
 function getFilteredPosts() {
   if (!window.DATA) return [];
-  return window.DATA.posts.filter(p => selectedSubs.has(p.subreddit));
+  return window.DATA.posts.filter(p => {
+    if (!selectedSubs.has(p.subreddit)) return false;
+    if (filterAI && !p.ai_related) return false;
+    if (filterAdobe && !p.adobe_related) return false;
+    return true;
+  });
 }
 
 function countBy(posts, key) {
@@ -1054,12 +1244,12 @@ function renderDistribution() {
   document.getElementById("subtitle-airel").textContent =
     `${aiPosts.length.toLocaleString()} AI-related (${posts.length ? Math.round(aiPosts.length/posts.length*100) : 0}%)`;
 
-  renderBarChart("chart-emotion", posts, "emotion", EMOTIONS, EMOTION_COLORS);
-  renderBarChart("chart-activity", posts, "activity", ACTIVITIES, ACTIVITY_COLORS);
-  renderBarChart("chart-airel", aiPosts, "ai_relation", AI_RELATIONS_NO_NONE, AI_RELATION_COLORS);
+  renderBarChart("chart-emotion",  posts,   "emotion",      EMOTIONS,          EMOTION_COLORS,      "Emotion");
+  renderBarChart("chart-activity", posts,   "activity",     ACTIVITIES,        ACTIVITY_COLORS,     "Creative Activity");
+  renderBarChart("chart-airel",    aiPosts, "ai_relation",  AI_RELATIONS_NO_NONE, AI_RELATION_COLORS, "AI Relation");
 }
 
-function renderBarChart(divId, posts, key, orderedKeys, colorMap) {
+function renderBarChart(divId, posts, key, orderedKeys, colorMap, chartLabel) {
   const counts = countBy(posts, key);
   const data = orderedKeys
     .map(k => ({ key: k, count: counts[k] || 0 }))
@@ -1110,6 +1300,54 @@ function renderBarChart(divId, posts, key, orderedKeys, colorMap) {
   };
 
   Plotly.react(divId, [trace], layout, { responsive: true, displaylogo: false });
+
+  // Attach click handler to show posts for clicked bar
+  const el = document.getElementById(divId);
+  el.removeAllListeners && el.removeAllListeners("plotly_click");
+  el.on("plotly_click", (event) => {
+    const pt = event.points[0];
+    if (!pt) return;
+    const labelDisplay = pt.y; // e.g. "reluctant adoption"
+    const labelKey = labelDisplay.replace(/ /g, "_"); // e.g. "reluctant_adoption"
+    const matching = posts
+      .filter(p => p[key] === labelKey)
+      .sort((a, b) => (b.score || 0) - (a.score || 0));
+    showDistPanel(labelDisplay, chartLabel, matching);
+  });
+}
+
+function showDistPanel(label, chartLabel, posts) {
+  const panel = document.getElementById("dist-post-panel");
+  const grid  = document.getElementById("dist-post-grid");
+  const title = document.getElementById("dist-panel-title");
+  const meta  = document.getElementById("dist-panel-meta");
+
+  title.textContent = label;
+  meta.textContent  = `${posts.length} post${posts.length !== 1 ? "s" : ""} · ${chartLabel} · sorted by score`;
+  grid.scrollTop = 0;
+
+  if (posts.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No posts for this tag.</div>`;
+  } else {
+    grid.innerHTML = posts.map(p => `
+      <div class="dist-post-card">
+        <div class="dist-post-card-title">${escHtml(p.title || "Untitled")}</div>
+        <div class="dist-post-card-meta">
+          <span class="dist-post-sub">r/${escHtml(p.subreddit)}</span>
+          <span class="dist-post-score">↑ ${(p.score || 0).toLocaleString()}</span>
+          ${p.url ? `<a class="dist-post-link" href="${escHtml(p.url)}" target="_blank" rel="noopener">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>Open</a>` : ""}
+        </div>
+      </div>`).join("");
+  }
+
+  panel.classList.add("visible");
+  // Scroll the panel into view smoothly
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 // ─────────────────────────────────────────────
@@ -1224,17 +1462,21 @@ function renderMatrix() {
 }
 
 function showSidePanel(emotion, aiRel, posts) {
-  const matching = posts.filter(p => p.emotion === emotion && p.ai_relation === aiRel);
-  const sample = matching.slice(0, 5);
+  const matching = posts
+    .filter(p => p.emotion === emotion && p.ai_relation === aiRel)
+    .sort((a, b) => (b.score || 0) - (a.score || 0)); // sort by score desc
 
   document.getElementById("side-panel-title").textContent =
-    `${emotion.replace(/_/g," ")} × ${aiRel.replace(/_/g," ")} · ${matching.length} posts`;
+    `${emotion.replace(/_/g," ")} × ${aiRel.replace(/_/g," ")} · ${matching.length} post${matching.length !== 1 ? "s" : ""}`;
 
   const body = document.getElementById("side-panel-body");
-  if (sample.length === 0) {
+  // Scroll back to top whenever a new cell is selected
+  body.closest(".side-panel-body-scroll").scrollTop = 0;
+
+  if (matching.length === 0) {
     body.innerHTML = `<div class="side-panel-hint">No posts found for this combination.</div>`;
   } else {
-    body.innerHTML = sample.map(p => `
+    body.innerHTML = matching.map(p => `
       <div class="post-card">
         <div class="post-title">${escHtml(p.title || "Untitled")}</div>
         <div class="post-meta">
@@ -1249,7 +1491,7 @@ function showSidePanel(emotion, aiRel, posts) {
           </a>` : ""}
         </div>
       </div>
-    `).join("");
+    `).join("") + (matching.length > 1 ? `<div class="side-panel-hint" style="padding:12px 0 4px;">${matching.length} posts — sorted by score</div>` : "");
   }
 
   document.getElementById("side-panel").classList.add("visible");
@@ -1292,7 +1534,9 @@ function renderUmap() {
       if (p.ux == null || p.uy == null) continue;
       xs.push(p.ux);
       ys.push(p.uy);
-      const inFilter = selectedSubs.has(p.subreddit);
+      const inFilter = selectedSubs.has(p.subreddit)
+        && (!filterAI || p.ai_related)
+        && (!filterAdobe || p.adobe_related);
       opacities.push(inFilter ? 0.75 : 0.08);
       const t = (p.title || "").slice(0, 80) + ((p.title || "").length > 80 ? "…" : "");
       texts.push(

@@ -1,0 +1,5 @@
+.DS_Store
+*.csv
+tagging_checkpoint.json
+result/
+__pycache__/
