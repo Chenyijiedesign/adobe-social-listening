@@ -1192,7 +1192,7 @@
 // Constants
 // ─────────────────────────────────────────────
 const EMOTIONS = ["pride","curiosity","excitement","neutral","anxiety","resentment","humor","skepticism","fatigue","nostalgia","grief","liberation"];
-const AI_RELATIONS = ["none","experimentation","augmentation","rejection","orchestration","reluctant_adoption","replacement","collaboration","optimization","adaptation","dependency","identity_shift"];
+const AI_RELATIONS = ["none","rejection","reluctant_adoption","replacement","experimentation","adaptation","augmentation","collaboration","orchestration","optimization","dependency","identity_shift"];
 const AI_RELATIONS_NO_NONE = AI_RELATIONS.filter(r => r !== "none");
 const ACTIVITIES = ["showcase","help_request","discussion","emotional_expression","workflow_share","critique","meme","tutorial","experimentation","prediction"];
 
@@ -2056,14 +2056,15 @@ function renderUmap() {
         && (!filterAdobe || p.adobe_related);
       opacities.push(inFilter ? 0.75 : 0.08);
       const t = (p.title || "").slice(0, 80) + ((p.title || "").length > 80 ? "…" : "");
+      const subPrefix = p.url ? "r/" : "";
       texts.push(
         `<b>${escHtml(t)}</b><br>` +
-        `r/${p.subreddit}<br>` +
+        `${subPrefix}${escHtml(p.subreddit)}<br>` +
         `${p.emotion || "—"} · ${(p.activity || "—").replace(/_/g," ")}<br>` +
         `AI: ${(p.ai_relation || "none").replace(/_/g," ")}<br>` +
-        `Score: ${(p.score || 0).toLocaleString()}`
+        `Score: ${(p.score || 0).toLocaleString()} · click to open`
       );
-      urls.push(p.url || "");
+      urls.push([p.url || "", p.id]);
     }
 
     const color = getGroupColor(label, umapColorBy);
@@ -2122,8 +2123,12 @@ function renderUmap() {
   umapEl.removeAllListeners && umapEl.removeAllListeners("plotly_click");
   umapEl.on("plotly_click", (event) => {
     const pt = event.points[0];
-    if (pt && pt.customdata) {
-      window.open(pt.customdata, "_blank", "noopener");
+    if (!pt || !pt.customdata) return;
+    const [url, postId] = pt.customdata;
+    if (url) {
+      window.open(url, "_blank", "noopener");
+    } else if (postId) {
+      openPostModal(postId);
     }
   });
 
