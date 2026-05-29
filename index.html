@@ -735,6 +735,103 @@
       .side-panel { width: 100%; }
     }
 
+    /* ── Full-text post modal ── */
+    #post-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.55);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    #post-modal-overlay.open { display: flex; }
+    #post-modal {
+      background: var(--bg);
+      border-radius: 12px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+      width: 100%;
+      max-width: 640px;
+      max-height: 82vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #post-modal-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    #post-modal-header-text { flex: 1; }
+    #post-modal-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.45;
+      margin-bottom: 6px;
+    }
+    #post-modal-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .modal-tag {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+    .modal-date { font-size: 11px; color: var(--text-muted); }
+    #post-modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+      flex-shrink: 0;
+      border-radius: 4px;
+    }
+    #post-modal-close:hover { background: var(--border); }
+    #post-modal-body {
+      padding: 18px 20px;
+      overflow-y: auto;
+      flex: 1;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #post-modal-body::-webkit-scrollbar { width: 4px; }
+    #post-modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Make LinkedIn post cards clickable */
+    .post-card-clickable { cursor: pointer; }
+    .post-card-clickable:hover { box-shadow: 0 0 0 2px var(--accent); }
+    .dist-post-card-clickable { cursor: pointer; }
+    .dist-post-card-clickable:hover { box-shadow: 0 0 0 2px var(--accent); }
+    .read-more-btn {
+      font-size: 11px;
+      color: var(--accent);
+      background: var(--accent-light);
+      border: none;
+      padding: 2px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-left: auto;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .read-more-btn:hover { opacity: 0.8; }
+
     /* ── Utility ── */
     .pill {
       display: inline-flex;
@@ -936,6 +1033,20 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Full-text post modal (LinkedIn) -->
+<div id="post-modal-overlay">
+  <div id="post-modal">
+    <div id="post-modal-header">
+      <div id="post-modal-header-text">
+        <div id="post-modal-title"></div>
+        <div id="post-modal-meta"></div>
+      </div>
+      <button id="post-modal-close">×</button>
+    </div>
+    <div id="post-modal-body"></div>
   </div>
 </div>
 
@@ -1212,6 +1323,9 @@ function setupEventListeners() {
     scheduleFilterUpdate();
   });
 
+  // Post full-text modal
+  setupModalEvents();
+
   // Platform toggle
   document.querySelectorAll(".platform-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1252,6 +1366,10 @@ function activatePlatform(platform, rerender) {
 
   // Reset UMAP rendered flag so it rebuilds for new data
   umapRendered = false;
+
+  // Build post lookup map for modal
+  window.POST_MAP = {};
+  for (const p of window.DATA.posts) window.POST_MAP[p.id] = p;
 
   // Rebuild sidebar & reset selections
   selectedSubs = new Set(window.DATA.posts.map(p => p.subreddit));
@@ -1315,6 +1433,46 @@ function countBy(posts, key) {
     m[v] = (m[v] || 0) + 1;
   }
   return m;
+}
+
+// ─────────────────────────────────────────────
+// Post full-text modal (LinkedIn)
+// ─────────────────────────────────────────────
+function openPostModal(postId) {
+  const p = window.POST_MAP && window.POST_MAP[postId];
+  if (!p) return;
+
+  document.getElementById("post-modal-title").textContent = p.title || "Post";
+
+  // Meta row: hashtag + emotion chip + date
+  const emotionColor = (window.EMOTION_COLORS || {})[p.emotion] || "#94A3B8";
+  document.getElementById("post-modal-meta").innerHTML = `
+    <span class="modal-tag" style="background:${emotionColor}22;color:${emotionColor};">${(p.emotion||"").replace(/_/g," ")}</span>
+    <span class="modal-tag">${escHtml(p.subreddit)}</span>
+    ${p.created_at ? `<span class="modal-date">${p.created_at}</span>` : ""}
+    ${p.score ? `<span class="modal-date">· ${p.score} reactions</span>` : ""}
+  `;
+
+  // Full text — use full_text if available, fall back to body_preview
+  const text = p.full_text || p.body_preview || p.title || "";
+  document.getElementById("post-modal-body").textContent = text;
+
+  document.getElementById("post-modal-overlay").classList.add("open");
+}
+
+function closePostModal() {
+  document.getElementById("post-modal-overlay").classList.remove("open");
+}
+
+// Wire modal close events (called once after DOM ready)
+function setupModalEvents() {
+  document.getElementById("post-modal-close").addEventListener("click", closePostModal);
+  document.getElementById("post-modal-overlay").addEventListener("click", e => {
+    if (e.target === document.getElementById("post-modal-overlay")) closePostModal();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closePostModal();
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -1436,23 +1594,23 @@ function showDistPanel(label, chartLabel, posts) {
     grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No posts for this tag.</div>`;
   } else {
     grid.innerHTML = posts.map(p => `
-      <div class="dist-post-card">
+      <div class="dist-post-card${!p.url ? ' dist-post-card-clickable' : ''}" ${!p.url ? `onclick="openPostModal('${p.id}')"` : ''}>
         <div class="dist-post-card-title">${escHtml(p.title || "Untitled")}</div>
         <div class="dist-post-card-meta">
-          <span class="dist-post-sub">r/${escHtml(p.subreddit)}</span>
+          <span class="dist-post-sub">${p.url ? 'r/' : ''}${escHtml(p.subreddit)}</span>
           <span class="dist-post-score">↑ ${(p.score || 0).toLocaleString()}</span>
-          ${p.url ? `<a class="dist-post-link" href="${escHtml(p.url)}" target="_blank" rel="noopener">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-              <polyline points="15 3 21 3 21 9"/>
-              <line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>Open</a>` : ""}
+          ${p.url
+            ? `<a class="dist-post-link" href="${escHtml(p.url)}" target="_blank" rel="noopener">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>Open</a>`
+            : `<button class="read-more-btn" onclick="event.stopPropagation();openPostModal('${p.id}')">Read full post ↗</button>`}
         </div>
       </div>`).join("");
   }
 
   panel.classList.add("visible");
-  // Scroll the panel into view smoothly
   panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
@@ -1583,18 +1741,18 @@ function showSidePanel(emotion, aiRel, posts) {
     body.innerHTML = `<div class="side-panel-hint">No posts found for this combination.</div>`;
   } else {
     body.innerHTML = matching.map(p => `
-      <div class="post-card">
+      <div class="post-card${!p.url ? ' post-card-clickable' : ''}" ${!p.url ? `onclick="openPostModal('${p.id}')"` : ''}>
         <div class="post-title">${escHtml(p.title || "Untitled")}</div>
         <div class="post-meta">
-          <span class="post-sub">r/${escHtml(p.subreddit)}</span>
+          <span class="post-sub">${p.url ? 'r/' : ''}${escHtml(p.subreddit)}</span>
           <span class="post-score">↑ ${(p.score || 0).toLocaleString()}</span>
-          ${p.url ? `<a class="post-link" href="${escHtml(p.url)}" target="_blank" rel="noopener">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-              <polyline points="15 3 21 3 21 9"/>
-              <line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>Open
-          </a>` : ""}
+          ${p.url
+            ? `<a class="post-link" href="${escHtml(p.url)}" target="_blank" rel="noopener">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>Open</a>`
+            : `<button class="read-more-btn" onclick="event.stopPropagation();openPostModal('${p.id}')">Read full post ↗</button>`}
         </div>
       </div>
     `).join("") + (matching.length > 1 ? `<div class="side-panel-hint" style="padding:12px 0 4px;">${matching.length} posts — sorted by score</div>` : "");

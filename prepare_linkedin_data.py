@@ -104,6 +104,7 @@ for i, r in enumerate(raw):
     posts.append({
         "id":           f"li-{i}",
         "title":        title,
+        "full_text":    text_clean,       # full cleaned text for modal
         "body_preview": text_clean[:180],
         "subreddit":    query,           # keeps same field name as Reddit
         "category":     get_category(query),
