@@ -1065,8 +1065,13 @@ function buildSidebar() {
     byCategory[cat].push(sub);
   }
 
-  // Render each category group
-  for (const [cat, subs] of Object.entries(byCategory)) {
+  // Render category groups in a fixed order (same for both platforms)
+  const CATEGORY_ORDER = ["3D & Gaming","Adobe","AI & Visual","Design & Branding","Motion & VFX","UX & Product","Other"];
+  const sortedCats = CATEGORY_ORDER.filter(c => byCategory[c])
+    .concat(Object.keys(byCategory).filter(c => !CATEGORY_ORDER.includes(c)));
+
+  for (const cat of sortedCats) {
+    const subs = byCategory[cat];
     const group = document.createElement("div");
     group.className = "category-group open";
     group.dataset.cat = cat;

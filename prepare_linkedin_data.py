@@ -40,6 +40,9 @@ ACTIVITY_NORM = {
 
 def get_category(query):
     q = query.lower().lstrip('#')
+    # UX must be checked before Design — 'design' is a substring of 'uxdesign', 'figmadesign', 'webdesign'
+    if q in ('uxdesign','figmadesign','webdesign','frontend','userexperience'):
+        return "UX & Product"
     if any(k in q for k in ['adobe','photoshop','aftereffects','lightroom',
                              'adobeanimate','premierepro','adobeillustrator','adobefirefly']):
         return "Adobe"
@@ -52,8 +55,6 @@ def get_category(query):
         return "3D & Gaming"
     if any(k in q for k in ['vfx','filmmakers','cinematography','editors']):
         return "Motion & VFX"
-    if any(k in q for k in ['uxdesign','figmadesign','webdesign','frontend','userexperience']):
-        return "UX & Product"
     return "Other"
 
 def clean_text(s):
