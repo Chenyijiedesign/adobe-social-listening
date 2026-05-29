@@ -656,28 +656,25 @@
     .collection-btn {
       display: flex;
       align-items: center;
-      gap: 7px;
-      width: 100%;
-      padding: 7px 11px;
-      border-radius: 8px;
-      border: 1.5px solid var(--border);
-      background: var(--bg);
-      font-size: 12px;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: none;
+      background: none;
+      font-size: 11px;
       font-weight: 500;
-      color: var(--text-muted);
+      color: var(--accent);
       cursor: pointer;
-      transition: all 0.15s;
-      text-align: left;
+      white-space: nowrap;
     }
-    .collection-btn:hover { border-color: #F59E0B; color: #92400E; background: #FFFBEB; }
+    .collection-btn:hover { background: var(--accent-light); }
     .collection-badge {
       background: #F59E0B;
       color: white;
       font-size: 10px;
       font-weight: 700;
-      padding: 1px 6px;
+      padding: 1px 5px;
       border-radius: 10px;
-      margin-left: auto;
     }
 
     /* ── Collection modal ── */
@@ -1012,15 +1009,11 @@
         <div class="sidebar-actions">
           <button id="select-all-btn">All</button>
           <button id="select-none-btn">None</button>
+          <button id="collection-btn" class="collection-btn">
+            ⭐ Collection
+            <span id="collection-badge" class="collection-badge" style="display:none">0</span>
+          </button>
         </div>
-      </div>
-
-      <!-- Collection button -->
-      <div class="quick-filters" style="padding-bottom:8px;">
-        <button id="collection-btn" class="collection-btn">
-          <span>⭐</span> Collection
-          <span id="collection-badge" class="collection-badge" style="display:none">0</span>
-        </button>
       </div>
 
       <!-- Quick filters -->
