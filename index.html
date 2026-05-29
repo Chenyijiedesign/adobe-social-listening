@@ -65,6 +65,32 @@
     header h1 { font-size: 16px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.01em; }
     header p { font-size: 12px; color: #94A3B8; margin-top: 1px; }
 
+    /* Platform toggle */
+    .platform-toggle {
+      display: flex;
+      background: rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .platform-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      border: none;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      background: transparent;
+      color: #94A3B8;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .platform-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+    .platform-btn.active { background: rgba(255,255,255,0.18); color: #fff; font-weight: 600; }
+
     #total-badge {
       background: rgba(99,102,241,0.25);
       color: #A5B4FC;
@@ -739,10 +765,20 @@
 
 <div id="app" style="display:none;">
   <header>
-    <div class="logo">R</div>
+    <div class="logo" id="header-logo">R</div>
     <div class="title-block">
-      <h1>Reddit Social Listening</h1>
-      <p>Adobe Creative Communities · 2026</p>
+      <h1 id="header-title">Reddit Social Listening</h1>
+      <p id="header-subtitle">Adobe Creative Communities · 2026</p>
+    </div>
+    <div class="platform-toggle">
+      <button class="platform-btn active" data-platform="reddit">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="9"/><path d="M16.67 10a1.46 1.46 0 00-2.47-1 7.12 7.12 0 00-3.85-1.23l.65-3.08 2.13.45a1 1 0 101.07-1 1 1 0 00-.96.68l-2.38-.5a.27.27 0 00-.32.2l-.73 3.44a7.14 7.14 0 00-3.89 1.23 1.46 1.46 0 10-1.61 2.39 2.87 2.87 0 000 .44c0 2.24 2.61 4.06 5.83 4.06s5.83-1.82 5.83-4.06a2.87 2.87 0 000-.44 1.46 1.46 0 00.6-1.08zM7.5 11a1 1 0 111 1 1 1 0 01-1-1zm5.56 2.65a3.44 3.44 0 01-3.06.6 3.44 3.44 0 01-3.06-.6.27.27 0 01.38-.38 2.93 2.93 0 002.68.46 2.93 2.93 0 002.68-.46.27.27 0 01.38.38zm-.18-1.65a1 1 0 111-1 1 1 0 01-1 1z" fill="white"/></svg>
+        Reddit
+      </button>
+      <button class="platform-btn" data-platform="linkedin">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        LinkedIn
+      </button>
     </div>
     <div id="total-badge">— posts</div>
   </header>
@@ -751,7 +787,7 @@
     <!-- Sidebar -->
     <div id="sidebar">
       <div class="sidebar-header">
-        <span>Subreddits</span>
+        <span id="sidebar-topics-label">Subreddits</span>
         <div class="sidebar-actions">
           <button id="select-all-btn">All</button>
           <button id="select-none-btn">None</button>
@@ -952,6 +988,8 @@ const CATEGORY_SUBREDDITS = {
 // State
 // ─────────────────────────────────────────────
 window.DATA = null;
+window.ALL_DATA = { reddit: null, linkedin: null };
+let activePlatform = "reddit";
 let selectedSubs = new Set();
 let filterAI = false;
 let filterAdobe = false;
@@ -964,10 +1002,24 @@ let debounceTimer = null;
 // Boot
 // ─────────────────────────────────────────────
 async function init() {
+  // Load both datasets in parallel; LinkedIn failure is non-fatal
   try {
-    const res = await fetch("viz_data.json");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    window.DATA = await res.json();
+    const [redditRes, linkedinRes] = await Promise.allSettled([
+      fetch("viz_data.json"),
+      fetch("linkedin_data.json")
+    ]);
+
+    if (redditRes.status === "fulfilled" && redditRes.value.ok) {
+      window.ALL_DATA.reddit = await redditRes.value.json();
+    } else {
+      throw new Error("Could not load viz_data.json");
+    }
+
+    if (linkedinRes.status === "fulfilled" && linkedinRes.value.ok) {
+      window.ALL_DATA.linkedin = await linkedinRes.value.json();
+    }
+    // LinkedIn failure is silently handled — button will be disabled below
+
   } catch(e) {
     document.getElementById("loading-overlay").style.display = "none";
     document.getElementById("app").style.display = "flex";
@@ -977,20 +1029,14 @@ async function init() {
     return;
   }
 
-  // Pre-compute sub→category map
-  window.SUB_TO_CAT = {};
-  for (const [cat, subs] of Object.entries(CATEGORY_SUBREDDITS)) {
-    for (const s of subs) window.SUB_TO_CAT[s] = cat;
+  // Disable LinkedIn button if data unavailable
+  if (!window.ALL_DATA.linkedin) {
+    document.querySelector('[data-platform="linkedin"]').disabled = true;
+    document.querySelector('[data-platform="linkedin"]').title = "linkedin_data.json not found";
   }
 
-  // Determine which subreddits actually have posts
-  const activeSubs = new Set(window.DATA.posts.map(p => p.subreddit));
-  window.ACTIVE_SUBS = activeSubs;
+  activatePlatform("reddit", false); // sets window.DATA, builds sidebar, resets filters
 
-  // Default: all selected
-  for (const s of activeSubs) selectedSubs.add(s);
-
-  buildSidebar();
   setupEventListeners();
   updateTotalBadge();
 
@@ -1008,21 +1054,24 @@ function buildSidebar() {
   const scroll = document.getElementById("filter-scroll");
   scroll.innerHTML = "";
 
-  // Sub counts
-  const subCount = {};
-  for (const p of window.DATA.posts) {
-    subCount[p.subreddit] = (subCount[p.subreddit] || 0) + 1;
+  const isLinkedIn = activePlatform === "linkedin";
+  const prefix = isLinkedIn ? "" : "r/";
+
+  // Group subreddits by category using data from the loaded JSON
+  const byCategory = {};
+  for (const sub of window.DATA.subreddits) {
+    const cat = sub.category || "Other";
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(sub);
   }
 
-  for (const [cat, subs] of Object.entries(CATEGORY_SUBREDDITS)) {
-    const activeSubs = subs.filter(s => window.ACTIVE_SUBS.has(s));
-    if (activeSubs.length === 0) continue;
-
+  // Render each category group
+  for (const [cat, subs] of Object.entries(byCategory)) {
     const group = document.createElement("div");
     group.className = "category-group open";
     group.dataset.cat = cat;
 
-    const totalCount = activeSubs.reduce((a, s) => a + (subCount[s] || 0), 0);
+    const totalCount = subs.reduce((a, s) => a + s.count, 0);
     const color = CATEGORY_COLORS[cat] || "#94A3B8";
 
     group.innerHTML = `
@@ -1036,11 +1085,11 @@ function buildSidebar() {
         <button class="cat-toggle" data-cat="${cat}">All</button>
       </div>
       <div class="category-items">
-        ${activeSubs.map(s => `
+        ${subs.map(s => `
           <div class="sub-item">
-            <input type="checkbox" id="sub-${s}" value="${s}" checked />
-            <label for="sub-${s}">r/${s}</label>
-            <span class="sub-count">${(subCount[s] || 0).toLocaleString()}</span>
+            <input type="checkbox" id="sub-${s.name}" value="${s.name}" checked />
+            <label for="sub-${s.name}">${prefix}${s.name}</label>
+            <span class="sub-count">${s.count.toLocaleString()}</span>
           </div>
         `).join("")}
       </div>
@@ -1157,6 +1206,58 @@ function setupEventListeners() {
     document.getElementById("filter-adobe-btn").dataset.active = filterAdobe;
     scheduleFilterUpdate();
   });
+
+  // Platform toggle
+  document.querySelectorAll(".platform-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const platform = btn.dataset.platform;
+      if (platform === activePlatform || !window.ALL_DATA[platform]) return;
+      activatePlatform(platform, true);
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+// Platform switching
+// ─────────────────────────────────────────────
+function activatePlatform(platform, rerender) {
+  activePlatform = platform;
+  window.DATA = window.ALL_DATA[platform];
+
+  // Update header
+  const isLinkedIn = platform === "linkedin";
+  document.getElementById("header-logo").textContent = isLinkedIn ? "in" : "R";
+  document.getElementById("header-logo").style.background = isLinkedIn
+    ? "linear-gradient(135deg, #0077B5 0%, #0A66C2 100%)"
+    : "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)";
+  document.getElementById("header-title").textContent = isLinkedIn
+    ? "LinkedIn Social Listening" : "Reddit Social Listening";
+  document.getElementById("sidebar-topics-label").textContent = isLinkedIn
+    ? "Hashtags" : "Subreddits";
+
+  // Update platform buttons
+  document.querySelectorAll(".platform-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.platform === platform);
+  });
+
+  // Reset quick filters
+  filterAI = false; filterAdobe = false;
+  document.getElementById("filter-ai-btn").dataset.active = "false";
+  document.getElementById("filter-adobe-btn").dataset.active = "false";
+
+  // Reset UMAP rendered flag so it rebuilds for new data
+  umapRendered = false;
+
+  // Rebuild sidebar & reset selections
+  selectedSubs = new Set(window.DATA.posts.map(p => p.subreddit));
+  window.ACTIVE_SUBS = new Set(window.DATA.posts.map(p => p.subreddit));
+  buildSidebar();
+  updateTotalBadge();
+
+  if (rerender) {
+    document.getElementById("dist-post-panel").classList.remove("visible");
+    renderTab(activeTab);
+  }
 }
 
 function setMatrixMode(mode) {
